@@ -29,11 +29,25 @@ namespace API_Final.Controllers
             return await _context.Players.ToListAsync();
         }
 
-        // GET: api/Players/[playerid]
-        [HttpGet("{id}")]
+        // GET: api/Players/id/[playerid]
+        [HttpGet("id/{id}")]
         public async Task<ActionResult<Player>> GetPlayer(int id)
         {
             var player = await _context.Players.FindAsync(id);
+
+            if (player == null)
+            {
+                return NotFound();
+            }
+
+            return player;
+        }
+
+        // GET: api/Players/[playername]
+        [HttpGet("{name}")]
+        public async Task<ActionResult<Player>> GetPlayerByName(string name)
+        {
+            Player player = (from p in _context.Players where p.PlayerName == name select p).First<Player>();
 
             if (player == null)
             {
