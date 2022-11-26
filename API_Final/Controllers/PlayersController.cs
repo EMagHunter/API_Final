@@ -7,6 +7,7 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using API_Final.Models;
 using Microsoft.Data.SqlClient;
+using System.Numerics;
 
 namespace API_Final.Controllers
 {
@@ -47,6 +48,15 @@ namespace API_Final.Controllers
         public async Task<ActionResult<int>> GetOnlineCount()
         {
             int OnlineCount = (from p in _context.Players where p.IsOnline select p).Count();
+
+            return OnlineCount;
+        }
+
+        // GET: api/Players/onlinecount/[region]
+        [HttpGet("onlinecount/{region}")]
+        public async Task<ActionResult<int>> GetOnlineCountForRegion(string region)
+        {
+            int OnlineCount = (from p in _context.Players where (p.IsOnline && p.PlayerRegion == region) select p).Count();
 
             return OnlineCount;
         }
@@ -93,64 +103,72 @@ namespace API_Final.Controllers
             return winrate;
         }
 
-
-        // PUT: api/Players/5
-        // To protect from overposting attacks, see https://go.microsoft.com/fwlink/?linkid=2123754
-        [HttpPut("{id}")]
-        public async Task<IActionResult> PutPlayer(int id, Player player)
+        // POST: api/Players/onlinestatus
+        // params: id, status
+        [HttpPost("onlinestatus")]
+        public async Task<IActionResult> SetOnlineStatus([FromQuery]int id, [FromQuery]bool online)
         {
-            if (id != player.PlayerId)
+            if (!PlayerExists(id))
             {
-                return BadRequest();
+                return NotFound();
             }
 
+            var player = await _context.Players.FindAsync(id);
+            player.IsOnline = online;
             _context.Entry(player).State = EntityState.Modified;
-
-            try
-            {
-                await _context.SaveChangesAsync();
-            }
-            catch (DbUpdateConcurrencyException)
-            {
-                if (!PlayerExists(id))
-                {
-                    return NotFound();
-                }
-                else
-                {
-                    throw;
-                }
-            }
+            await _context.SaveChangesAsync();
 
             return NoContent();
         }
 
-        // POST: api/Players
-        // To protect from overposting attacks, see https://go.microsoft.com/fwlink/?linkid=2123754
-        [HttpPost]
-        public async Task<ActionResult<Player>> PostPlayer(Player player)
+        // POST: api/Players/register
+        //params: name, region
+        [HttpPost("register")]
+        public async Task<ActionResult<Player>> PostPlayer([FromQuery]string name, [FromQuery]string region)
         {
+            Player player = new Player();
+            player.PlayerName = name;
+            player.PlayerRegion = region;
+            player.IsOnline = false; 
+            
             _context.Players.Add(player);
             await _context.SaveChangesAsync();
 
             return CreatedAtAction("GetPlayer", new { id = player.PlayerId }, player);
         }
 
-        // DELETE: api/Players/5
-        [HttpDelete("{id}")]
-        public async Task<IActionResult> DeletePlayer(int id)
+        // POST: api/Players/matchresult
+        //params: player1, player2, winner
+        [HttpPost("matchresult")]
+        public async Task<ActionResult<Match>> PostMatch([FromQuery] int player1, [FromQuery] int player2, [FromQuery] int winner)
         {
-            var player = await _context.Players.FindAsync(id);
-            if (player == null)
+
+            if (winner != player1 && winner != player2)
+            {
+                return BadRequest();
+            }
+
+            if (!PlayerExists(player1) || !PlayerExists(player2))
             {
                 return NotFound();
             }
 
-            _context.Players.Remove(player);
+            Match match = new Match();
+            match.Player1 = player1;
+            match.Player2 = player2;
+            match.Winner = winner;
+            match.MatchTimestamp = DateTime.Now;
+
+            _context.Matches.Add(match);
             await _context.SaveChangesAsync();
 
-            return NoContent();
+            //for some reason using CreatedAtAction here causes an error saying "No route matches the supplied values."
+            //I can't tell what's wrong. I'd really love to know, but the internet wasn't very helpful
+            //I figure some information that would otherwise be present in the reponse is missing when I return only the
+            //match object, but as it stands this is preferable over an error screen.
+            return match; 
         }
+
 
         private bool PlayerExists(int id)
         {
