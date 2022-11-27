@@ -24,89 +24,102 @@ namespace API_Final.Controllers
 
         // GET: api/Players
         [HttpGet]
-        public async Task<ActionResult<IEnumerable<Player>>> GetPlayers()
+        public async Task<Response<IEnumerable<Player>>> GetPlayers()
         {
-            return await _context.Players.ToListAsync();
+            return new(StatusCodes.Status200OK, "OK", await _context.Players.ToListAsync());
         }
 
         // GET: api/Players/id/[playerid]
         [HttpGet("id/{id}")]
-        public async Task<ActionResult<Player>> GetPlayer(int id)
+        public async Task<Response<Player>> GetPlayer(int id)
         {
             var player = await _context.Players.FindAsync(id);
 
             if (player == null)
             {
-                return NotFound();
+                return PlayerNotFound();
             }
-
-            return player;
+            
+            return new(StatusCodes.Status200OK, "OK", player);
         }
 
-        // GET: api/Players/[playername]
-        [HttpGet("{name}")]
-        public async Task<ActionResult<Player>> GetPlayerByName(string name)
+        // GET: api/Players/name/[playername]
+        [HttpGet("name/{name}")]
+        public Response<Player> GetPlayerByName(string name)
         {
-            Player player = (from p in _context.Players where p.PlayerName == name select p).First<Player>();
+            IQueryable<Player> query = (from p in _context.Players where p.PlayerName == name select p);
+            Player player = query.Count() == 0 ? null : query.First<Player>();
 
             if (player == null)
             {
-                return NotFound();
+                return PlayerNotFound();
             }
 
-            return player;
+            return new(StatusCodes.Status200OK, "OK", player);
         }
 
         // GET: api/Players/onlinecount
         [HttpGet("onlinecount")]
-        public async Task<ActionResult<int>> GetOnlineCount()
+        public Response<int> GetOnlineCount()
         {
             int OnlineCount = (from p in _context.Players where p.IsOnline select p).Count();
-
-            return OnlineCount;
+            return new(StatusCodes.Status200OK, "OK", OnlineCount);
         }
 
         // GET: api/Players/onlinecount/[region]
         [HttpGet("onlinecount/{region}")]
-        public async Task<ActionResult<int>> GetOnlineCountForRegion(string region)
+        public Response<int> GetOnlineCountForRegion(string region)
         {
             int OnlineCount = (from p in _context.Players where (p.IsOnline && p.PlayerRegion == region) select p).Count();
-
-            return OnlineCount;
+            return new(StatusCodes.Status200OK, "OK", OnlineCount);
         }
 
         // GET: api/Players/matches
         [HttpGet("matches")]
-        public async Task<ActionResult<IEnumerable<Match>>> GetMatches()
+        public async Task<Response<IEnumerable<Match>>> GetMatches()
         {
-            return await _context.Matches.ToListAsync();
+            return new(StatusCodes.Status200OK, "OK", await _context.Matches.ToListAsync());
+        }
+
+        // GET: api/Players/match/[playerid]
+        [HttpGet("match/{id}")]
+        public async Task<Response<Match>> GetMatch(int id)
+        {
+            var match = await _context.Matches.FindAsync(id);
+
+            if (match == null)
+            {
+                return MatchNotFound();
+            }
+
+            return new(StatusCodes.Status200OK, "OK", match);
         }
 
         // GET: api/Players/matchcount/[playerid]
         [HttpGet("matchcount/{id}")]
-        public async Task<ActionResult<int>> GetPlayerMatchCount(int id)
+        public async Task<Response<int>> GetPlayerMatchCount(int id)
         {
             var player = await _context.Players.FindAsync(id);
 
             if (player == null)
             {
-                return NotFound();
+                return new(404, "Player not found", 0);
             }
 
             int numMatchesPlayed = (from m in _context.Matches where (m.Player1 == id || m.Player2 == id) select m).Count();
 
-            return numMatchesPlayed;
+            return new(StatusCodes.Status200OK, "OK", numMatchesPlayed);
         }
 
         // GET: api/Players/winrate/[playerid]
         [HttpGet("winrate/{id}")]
-        public async Task<ActionResult<float>> GetPlayerWinrate(int id)
+        public async Task<Response<float>> GetPlayerWinrate(int id)
         {
             var player = await _context.Players.FindAsync(id);
 
             if (player == null)
             {
-                return NotFound();
+                return new(StatusCodes.Status404NotFound, "Player not found", 0);
             }
 
             int numMatchesPlayed = (from m in _context.Matches where (m.Player1 == id || m.Player2 == id) select m).Count();
@@ -114,17 +127,17 @@ namespace API_Final.Controllers
 
             float winrate = numMatchesPlayed == 0 ? 0.0f : (float)numMatchesWon / (float)numMatchesPlayed;
 
-            return winrate;
+            return new(StatusCodes.Status200OK, "OK", winrate);
         }
 
-        // POST: api/Players/onlinestatus
+        // PATCH: api/Players/onlinestatus
         // params: id, status
-        [HttpPost("onlinestatus")]
-        public async Task<IActionResult> SetOnlineStatus([FromQuery]int id, [FromQuery]bool online)
+        [HttpPatch("onlinestatus")]
+        public async Task<Response<Player>> SetOnlineStatus([FromQuery]int id, [FromQuery]bool online)
         {
             if (!PlayerExists(id))
             {
-                return NotFound();
+                return PlayerNotFound();
             }
 
             var player = await _context.Players.FindAsync(id);
@@ -132,14 +145,26 @@ namespace API_Final.Controllers
             _context.Entry(player).State = EntityState.Modified;
             await _context.SaveChangesAsync();
 
-            return NoContent();
+            return new(StatusCodes.Status202Accepted, "Online status updated", player);
         }
 
         // POST: api/Players/register
         //params: name, region
         [HttpPost("register")]
-        public async Task<ActionResult<Player>> PostPlayer([FromQuery]string name, [FromQuery]string region)
+        public async Task<Response<Player>> PostPlayer([FromQuery]string name, [FromQuery]string region)
         {
+            if (name.Length > 20)
+            {
+                return new(StatusCodes.Status400BadRequest, "Name must be at most 20 characters", null);
+            }
+            if (region != "NA" && region != "EU")
+            {
+                return new(StatusCodes.Status400BadRequest, "Region must be NA or EU", null);
+            }
+            if (GetPlayerByName(name).Data != null)
+            {
+                return new(StatusCodes.Status400BadRequest, "Name already in use", null);
+            }
             Player player = new Player();
             player.PlayerName = name;
             player.PlayerRegion = region;
@@ -148,23 +173,26 @@ namespace API_Final.Controllers
             _context.Players.Add(player);
             await _context.SaveChangesAsync();
 
-            return CreatedAtAction("GetPlayer", new { id = player.PlayerId }, player);
+            return new(StatusCodes.Status201Created, "New player created", player);
         }
 
         // POST: api/Players/matchresult
         //params: player1, player2, winner
         [HttpPost("matchresult")]
-        public async Task<ActionResult<Match>> PostMatch([FromQuery] int player1, [FromQuery] int player2, [FromQuery] int winner)
+        public async Task<Response<Match>> PostMatch([FromQuery] int player1, [FromQuery] int player2, [FromQuery] int winner)
         {
 
             if (winner != player1 && winner != player2)
             {
-                return BadRequest();
+                return new(StatusCodes.Status400BadRequest, "Winner must be one of the participating players", null);
             }
 
             if (!PlayerExists(player1) || !PlayerExists(player2))
             {
-                return NotFound();
+                if (!PlayerExists(player1))
+                    return new(StatusCodes.Status404NotFound, "Player 1 not found", null);
+                else
+                    return new(StatusCodes.Status404NotFound, "Player 2 not found", null);
             }
 
             Match match = new Match();
@@ -176,17 +204,25 @@ namespace API_Final.Controllers
             _context.Matches.Add(match);
             await _context.SaveChangesAsync();
 
-            //for some reason using CreatedAtAction here causes an error saying "No route matches the supplied values."
-            //I can't tell what's wrong. I'd really love to know, but the internet wasn't very helpful
-            //I figure some information that would otherwise be present in the reponse is missing when I return only the
-            //match object, but as it stands this is preferable over an error screen.
-            return match; 
+            return new(StatusCodes.Status201Created, "Match data created", match); 
         }
 
 
         private bool PlayerExists(int id)
         {
             return _context.Players.Any(e => e.PlayerId == id);
+        }
+
+        private Response<Player> PlayerNotFound()
+        {
+            Response<Player> r = new(StatusCodes.Status404NotFound, "Player not found", null);
+            return r;
+        }
+
+        private Response<Match> MatchNotFound()
+        {
+            Response<Match> r = new(StatusCodes.Status404NotFound, "Match not found", null);
+            return r;
         }
     }
 }

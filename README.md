@@ -9,14 +9,15 @@ These are the HTTP methods currently supported:
 |        API        |    Description   | Request Paramters | Response Body |
 | ----------------- | ---------------- | ----------------- | ------------- |
 | GET /api/players/ | List all players | None              | JSON List     |
-| GET /api/players/{name} | Get player from name | None | Player data |
+| GET /api/players/name/{name} | Get specific player from name | None | Player data |
 | GET /api/players/id/{id} | Get specific player from ID | None | Player data |
 | GET /api/players/onlinecount | Count number of online players | None | Integer |
 | GET /api/players/onlinecount/{region} | Count number of online players in a particular region (NA or EU) | None | Integer |
 | GET /api/players/matches | List all recorded matches | None | JSON List |
+| GET /api/players/match/{id} | Get specific match data | None | Match data |
 | GET /api/players/winrate/{id} | Get winrate of a specific player | None | Float point value |
 | GET /api/players/matchcount/{id} | Get total number of matches played by a player | None | Integer |
-| POST /api/players/onlinestatus | Set online status for specific player | id (string), online (boolean) | None |
+| PATCH /api/players/onlinestatus | Set online status for specific player | id (string), online (boolean) | Player data |
 | POST /api/players/register | Add player to player list | name (string), region (string) | Player data |
 | POST /api/players/matchresult | Add match to match list | player1 (int), player2 (int), winner(int) | Match data |
 
@@ -31,4 +32,18 @@ Match data consists of the match's ID, its two players, the winner between them,
 Sample:
 ```
 {"matchId":1,"player1":1,"player2":2,"winner":1,"matchTimestamp":"2022-11-26T14:52:07"}
+```
+
+Sample output of a call to this API:
+```
+{
+    "statusCode": 200,
+    "statusDescription": "OK",
+    "data": {
+        "playerId": 2,
+        "playerName": "Johnson",
+        "isOnline": false,
+        "playerRegion": "EU"
+    }
+}
 ```
