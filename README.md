@@ -6,7 +6,7 @@ Player names must be unique.
 
 These are the HTTP methods currently supported:
 
-|        API        |    Description   | Request Paramters | Response Body |
+|        API        |    Description   | Request Parameters | Response Body |
 | ----------------- | ---------------- | ----------------- | ------------- |
 | GET /api/players/ | List all players | None              | List of player data  |
 | GET /api/players/name/{name} | Get specific player from name | None | Player data |
